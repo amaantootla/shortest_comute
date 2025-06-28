@@ -13,6 +13,7 @@ from api_structures import Coordinates, RouteInfo
 # --- API Configuration ---
 # Keys are read from environment variables for security.
 TOMTOM_API_KEY = os.getenv("TOMTOM_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 
 # --- Blueprint for all API Adapters ---
@@ -92,4 +93,83 @@ class TomTomAdapter(ApiAdapter):
         except (KeyError, IndexError):
             print(
                 f"   > [TomTom] Could not find a valid route for the specified time.")
+            return None
+
+# --- Google Maps Implementation ---
+
+
+class GoogleMapsAdapter(ApiAdapter):
+    """The adapter for the Google Maps API."""
+    GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+    DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json"
+
+    def __init__(self):
+        if not GOOGLE_API_KEY:
+            raise ValueError(
+                "FATAL ERROR: The GOOGLE_API_KEY environment variable is not set.")
+
+    def get_coordinates(self, address: str) -> Coordinates | None:
+        print(f"   > [Google] Geocoding address: '{address}'...")
+        params = {
+            'address': address,
+            'key': GOOGLE_API_KEY
+        }
+        try:
+            response = requests.get(self.GEOCODING_URL, params=params)
+            response.raise_for_status()
+            data = response.json()
+            if data.get('status') == 'OK' and data.get('results'):
+                location = data['results'][0]['geometry']['location']
+                # *** NORMALIZATION to our standard Coordinates object ***
+                return Coordinates(lat=location['lat'], lon=location['lng'])
+            else:
+                print(
+                    f"   > Error: Could not find coordinates for address: {address}. Status: {data.get('status')}")
+                return None
+        except requests.exceptions.RequestException as e:
+            print(f"   > Error connecting to Google Geocoding API: {e}")
+            return None
+        except (KeyError, IndexError):
+            print(
+                f"   > Error parsing Google Geocoding API response for: {address}")
+            return None
+
+    def get_route(self, start_coords: Coordinates, end_coords: Coordinates, departure_time: datetime) -> RouteInfo | None:
+        origin = f"{start_coords.lat},{start_coords.lon}"
+        destination = f"{end_coords.lat},{end_coords.lon}"
+
+        # Google Directions API requires departure_time as a Unix timestamp.
+        departure_timestamp = int(departure_time.timestamp())
+
+        params = {
+            'origin': origin,
+            'destination': destination,
+            'departure_time': departure_timestamp,
+            'key': GOOGLE_API_KEY
+        }
+        try:
+            response = requests.get(self.DIRECTIONS_URL, params=params)
+            response.raise_for_status()
+            data = response.json()
+            if data.get('status') == 'OK' and data.get('routes'):
+                leg = data['routes'][0]['legs'][0]
+                # Use duration_in_traffic if available, otherwise fall back to duration.
+                if 'duration_in_traffic' in leg:
+                    travel_seconds = leg['duration_in_traffic']['value']
+                else:
+                    travel_seconds = leg['duration']['value']
+
+                # *** NORMALIZATION to our standard RouteInfo object ***
+                return RouteInfo(travel_time_sec=travel_seconds)
+            else:
+                print(
+                    f"   > [Google] Could not find a valid route. Status: {data.get('status')}")
+                return None
+        except requests.exceptions.RequestException as e:
+            print(
+                f"   > [Google] A network error occurred for route calculation: {e}")
+            return None
+        except (KeyError, IndexError):
+            print(
+                f"   > [Google] Could not find a valid route for the specified time.")
             return None

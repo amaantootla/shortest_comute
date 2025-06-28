@@ -4,8 +4,8 @@
 import time
 from datetime import datetime, timedelta, date
 
-# Import the adapter blueprint and the specific implementation we want to use
-from api_adapters import ApiAdapter, TomTomAdapter
+# Import the adapter blueprint and the specific implementations
+from api_adapters import ApiAdapter, TomTomAdapter, GoogleMapsAdapter
 
 # --- Helper Functions (Not API-specific) ---
 
@@ -146,10 +146,24 @@ if __name__ == '__main__':
     print("This tool will test multiple departure times to find the one that")
     print("minimizes your total daily commute time (morning + evening).\n")
 
+    # 1. CHOOSE AND CREATE THE ADAPTER TO USE
+    print("Select the mapping API to use:")
+    print("1. Google Maps (Default)")
+    print("2. TomTom")
+    api_choice = input("Enter your choice [1]: ") or "1"
+
+    selected_api_adapter = None
     try:
-        # 1. CHOOSE AND CREATE THE ADAPTER TO USE
-        # To switch to a different API, you would just change this one line.
-        selected_api_adapter = TomTomAdapter()
+        if api_choice == '2':
+            print("Using TomTom API.\n")
+            selected_api_adapter = TomTomAdapter()
+        else:
+            if api_choice != '1':
+                print("Invalid choice. Using Google Maps API by default.\n")
+            else:
+                print("Using Google Maps API.\n")
+            selected_api_adapter = GoogleMapsAdapter()
+
     except ValueError as e:
         print(e)
         exit()
