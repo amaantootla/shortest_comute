@@ -5,11 +5,13 @@ import os
 from datetime import datetime
 from urllib.parse import quote
 from abc import ABC, abstractmethod
+from dotenv import load_dotenv
 
 from api_structures import Coordinates, RouteInfo
 
 # --- API Configuration ---
 # Keys are read from environment variables for security.
+load_dotenv()
 TOMTOM_API_KEY = os.getenv("TOMTOM_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 

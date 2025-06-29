@@ -1,7 +1,10 @@
 # Main script to analyze and optimize daily commute times.
 
 import time
+import os
 from datetime import datetime, timedelta, date
+from zoneinfo import ZoneInfo
+from dotenv import load_dotenv
 from api_adapters import ApiAdapter, TomTomAdapter, GoogleMapsAdapter
 
 
@@ -52,8 +55,10 @@ def analyze_commute_scenarios(
     start_hour = 6
     end_hour = 10
     increment_minutes = 30
-    current_time = datetime(
+    naive_start_time = datetime(
         analysis_date.year, analysis_date.month, analysis_date.day, start_hour)
+    current_time = naive_start_time.replace(tzinfo=COMMUTE_TZ)
+
     end_time = current_time.replace(hour=end_hour)
 
     print(
@@ -153,6 +158,7 @@ def display_results(scenarios: list, analysis_date: date):
 
 
 if __name__ == '__main__':
+    load_dotenv()
     print("Welcome to the Daily Commute Optimizer.")
     print("This tool tests multiple departure times to find the one that")
     print("minimizes your total daily commute time (morning + evening).\n")
@@ -177,6 +183,17 @@ if __name__ == '__main__':
     except ValueError as e:
         print(e)
         exit()
+
+    COMMUTE_TIMEZONE_STR = os.getenv("COMMUTE_TZ", "America/Los_Angeles")
+    try:
+        COMMUTE_TZ = ZoneInfo(COMMUTE_TIMEZONE_STR)
+    except Exception:
+        print(
+            f"FATAL ERROR: The timezone '{COMMUTE_TIMEZONE_STR}' set in the COMMUTE_TZ environment variable is invalid.")
+        print("Please use a valid IANA timezone name (e.g., 'America/New_York', 'Europe/London').")
+        exit()
+    finally:
+        print(f"Using timezone: {COMMUTE_TZ.key}")
 
     home = input(
         "Enter your Home Address [Default: 1 Rocket Road, Hawthorne, CA]: ") or "1 Rocket Road, Hawthorne, CA"
