@@ -1,17 +1,17 @@
-# api_structures.py
-# Defines the standardized data structures for our application.
+# Defines the standardized, internal data structures for the application.
 
 from dataclasses import dataclass
 
 
 @dataclass
 class Coordinates:
-    """Our internal, standardized representation of geographic coordinates."""
+    """A standardized representation of geographic coordinates."""
     lat: float
     lon: float
 
 
 @dataclass
 class RouteInfo:
-    """Our internal, standardized representation of a route's travel time."""
+    """A standardized representation of a route's travel time."""
     travel_time_sec: int
+    traffic_data_included: bool

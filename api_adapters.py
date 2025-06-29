@@ -1,4 +1,3 @@
-# api_adapters.py
 # Contains the adapter classes for communicating with external mapping APIs.
 
 import requests
@@ -7,7 +6,6 @@ from datetime import datetime
 from urllib.parse import quote
 from abc import ABC, abstractmethod
 
-# Import our standard data structures
 from api_structures import Coordinates, RouteInfo
 
 # --- API Configuration ---
@@ -15,8 +13,6 @@ from api_structures import Coordinates, RouteInfo
 TOMTOM_API_KEY = os.getenv("TOMTOM_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-
-# --- Blueprint for all API Adapters ---
 
 class ApiAdapter(ABC):
     """
@@ -33,8 +29,6 @@ class ApiAdapter(ABC):
         """Calculates a route and returns our standard RouteInfo object."""
         pass
 
-
-# --- TomTom Implementation ---
 
 class TomTomAdapter(ApiAdapter):
     """The adapter for the TomTom API."""
@@ -85,17 +79,18 @@ class TomTomAdapter(ApiAdapter):
             data = response.json()
             # *** NORMALIZATION to our standard RouteInfo object ***
             travel_seconds = data['routes'][0]['summary']['travelTimeInSeconds']
-            return RouteInfo(travel_time_sec=travel_seconds)
+            # When 'traffic' is set to 'true', TomTom's travelTimeInSeconds includes traffic delay.
+            return RouteInfo(travel_time_sec=travel_seconds, traffic_data_included=True)
         except requests.exceptions.RequestException as e:
+            departure_str = departure_time.strftime('%I:%M %p')
             print(
-                f"   > [TomTom] A network error occurred for route calculation: {e}")
+                f"   > [TomTom] A network error occurred for route calculation at {departure_str}: {e}")
             return None
         except (KeyError, IndexError):
+            departure_str = departure_time.strftime('%I:%M %p')
             print(
-                f"   > [TomTom] Could not find a valid route for the specified time.")
+                f"   > [TomTom] Could not find a valid route for the departure time: {departure_str}.")
             return None
-
-# --- Google Maps Implementation ---
 
 
 class GoogleMapsAdapter(ApiAdapter):
@@ -138,7 +133,7 @@ class GoogleMapsAdapter(ApiAdapter):
         origin = f"{start_coords.lat},{start_coords.lon}"
         destination = f"{end_coords.lat},{end_coords.lon}"
 
-        # Google Directions API requires departure_time as a Unix timestamp.
+        # Google's Directions API requires departure_time as a Unix timestamp.
         departure_timestamp = int(departure_time.timestamp())
 
         params = {
@@ -153,23 +148,28 @@ class GoogleMapsAdapter(ApiAdapter):
             data = response.json()
             if data.get('status') == 'OK' and data.get('routes'):
                 leg = data['routes'][0]['legs'][0]
+                traffic_used = False
                 # Use duration_in_traffic if available, otherwise fall back to duration.
                 if 'duration_in_traffic' in leg:
                     travel_seconds = leg['duration_in_traffic']['value']
+                    traffic_used = True
                 else:
                     travel_seconds = leg['duration']['value']
 
                 # *** NORMALIZATION to our standard RouteInfo object ***
-                return RouteInfo(travel_time_sec=travel_seconds)
+                return RouteInfo(travel_time_sec=travel_seconds, traffic_data_included=traffic_used)
             else:
+                departure_str = departure_time.strftime('%I:%M %p')
                 print(
-                    f"   > [Google] Could not find a valid route. Status: {data.get('status')}")
+                    f"   > [Google] Could not find a valid route for {departure_str}. Status: {data.get('status')}")
                 return None
         except requests.exceptions.RequestException as e:
+            departure_str = departure_time.strftime('%I:%M %p')
             print(
-                f"   > [Google] A network error occurred for route calculation: {e}")
+                f"   > [Google] A network error occurred for route calculation at {departure_str}: {e}")
             return None
         except (KeyError, IndexError):
+            departure_str = departure_time.strftime('%I:%M %p')
             print(
-                f"   > [Google] Could not find a valid route for the specified time.")
+                f"   > [Google] Could not find a valid route for the departure time: {departure_str}.")
             return None
