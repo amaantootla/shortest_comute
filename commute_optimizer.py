@@ -6,7 +6,7 @@ import argparse
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
-from api_adapters import ApiAdapter, TomTomAdapter, GoogleMapsAdapter
+from api_adapters import *
 
 
 def get_next_weekday() -> date:
@@ -171,24 +171,37 @@ if __name__ == '__main__':
     print("This tool tests multiple departure times to find the one that")
     print("minimizes your total daily commute time (morning + evening).\n")
 
-    print("Select the mapping API to use:")
-    print("1. Google Maps (Default)")
+    print("Select the mapping services to use:")
+    print("1. Google Maps")
     print("2. TomTom")
-    api_choice = input("Enter your choice [1]: ") or "1"
+    print("3. Geocode.co with Google Fallback (Saves API calls) (Default)")
+    print("4. Geocode.co with TomTom Fallback (Saves API calls)")
+    api_choice = input("Enter your choice [3]: ") or "3"
 
     selected_api_adapter = None
     try:
         if api_choice == '2':
             print("Using TomTom API.\n")
             selected_api_adapter = TomTomAdapter(verbose=args.verbose)
+        elif api_choice == '3':
+            print("Using Geocode.co with Google Maps for routing/fallback.\n")
+            primary = GeocodeCoAdapter(verbose=args.verbose)
+            fallback = GoogleMapsAdapter(verbose=args.verbose)
+            selected_api_adapter = FallbackGeocoderAdapter(
+                primary, fallback, verbose=args.verbose)
+        elif api_choice == '4':
+            print("Using Geocode.co with TomTom for routing/fallback.\n")
+            primary = GeocodeCoAdapter(verbose=args.verbose)
+            fallback = TomTomAdapter(verbose=args.verbose)
+            selected_api_adapter = FallbackGeocoderAdapter(
+                primary, fallback, verbose=args.verbose)
         else:
             if api_choice != '1':
                 print("Invalid choice. Using Google Maps API by default.\n")
             else:
                 print("Using Google Maps API.\n")
             selected_api_adapter = GoogleMapsAdapter(verbose=args.verbose)
-
-    except ValueError as e:
+    except (ValueError, NotImplementedError) as e:
         print(e)
         exit()
 

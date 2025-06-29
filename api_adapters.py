@@ -2,6 +2,7 @@
 
 import requests
 import os
+import time
 from datetime import datetime
 from urllib.parse import quote
 from abc import ABC, abstractmethod
@@ -14,6 +15,7 @@ from api_structures import Coordinates, RouteInfo
 load_dotenv()
 TOMTOM_API_KEY = os.getenv("TOMTOM_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GEOCODECO_API_KEY = os.getenv("GEOCODECO_API_KEY")
 
 
 class ApiAdapter(ABC):
@@ -30,6 +32,89 @@ class ApiAdapter(ABC):
     def get_route(self, start_coords: Coordinates, end_coords: Coordinates, departure_time: datetime) -> RouteInfo | None:
         """Calculates a route and returns our standard RouteInfo object."""
         pass
+
+
+class GeocodeCoAdapter(ApiAdapter):
+    """The adapter for the geocode.maps.co API (geocoding only)."""
+    GEOCODE_URL = "https://geocode.maps.co/search"
+
+    def __init__(self, verbose: bool = False):
+        self.verbose = verbose
+        if not GEOCODECO_API_KEY:
+            raise ValueError(
+                "FATAL ERROR: The GEOCODECO_API_KEY environment variable is not set.")
+
+    def get_coordinates(self, address: str) -> Coordinates | None:
+        print(f"   > [Geocode.co] Geocoding address: '{address}'...")
+        params = {'q': address, 'api_key': GEOCODECO_API_KEY}
+
+        if self.verbose:
+            full_url = f"{self.GEOCODE_URL}?{requests.compat.urlencode(params)}"
+            print(f"   > [API-TRACE] Request URL: {full_url}")
+
+        try:
+            response = requests.get(self.GEOCODE_URL, params=params)
+            # This free API has a rate limit of 1 request/second.
+            time.sleep(1.1)  # Pause to respect rate limit
+
+            if response.status_code == 429:
+                print("   > Error: Exceeded API rate limit for geocode.maps.co.")
+                return None
+
+            response.raise_for_status()
+            data = response.json()
+
+            if data:
+                # *** NORMALIZATION to our standard Coordinates object ***
+                location = data[0]
+                return Coordinates(lat=float(location['lat']), lon=float(location['lon']))
+            else:
+                print(
+                    f"   > Error: Could not find coordinates for address: {address}")
+                return None
+        except requests.exceptions.RequestException as e:
+            print(f"   > Error connecting to Geocode.co API: {e}")
+            return None
+        except (KeyError, IndexError):
+            print(f"   > Error parsing Geocode.co API response for: {address}")
+            return None
+
+    def get_route(self, start_coords: Coordinates, end_coords: Coordinates, departure_time: datetime) -> RouteInfo | None:
+        """This service does not provide routing information."""
+        raise NotImplementedError(
+            "Geocode.co is a geocoding-only service and cannot calculate routes.")
+
+
+class FallbackGeocoderAdapter(ApiAdapter):
+    """
+    A composite adapter that uses a primary geocoder and falls back
+    to another adapter for routing and failed geocoding lookups.
+    """
+
+    def __init__(self, primary_geocoder: ApiAdapter, fallback_adapter: ApiAdapter, verbose: bool = False):
+        self.primary_geocoder = primary_geocoder
+        self.fallback_adapter = fallback_adapter
+        self.verbose = verbose
+
+    def get_coordinates(self, address: str) -> Coordinates | None:
+        if self.verbose:
+            print(
+                f"\nAttempting geocoding with primary: {type(self.primary_geocoder).__name__}")
+
+        coords = self.primary_geocoder.get_coordinates(address)
+        if coords:
+            return coords
+
+        print(
+            f"\n   ! Primary geocoder failed. Falling back to {type(self.fallback_adapter).__name__}.")
+        return self.fallback_adapter.get_coordinates(address)
+
+    def get_route(self, start_coords: Coordinates, end_coords: Coordinates, departure_time: datetime) -> RouteInfo | None:
+        # Routing is always delegated to the fallback adapter.
+        if self.verbose:
+            print(
+                f"\nRouting calculation handled by: {type(self.fallback_adapter).__name__}")
+        return self.fallback_adapter.get_route(start_coords, end_coords, departure_time)
 
 
 class TomTomAdapter(ApiAdapter):
@@ -85,7 +170,7 @@ class TomTomAdapter(ApiAdapter):
         if self.verbose:
             full_url = f"{url}?{requests.compat.urlencode(params)}"
             print(f"   > [API-TRACE] Request URL: {full_url}")
-            
+
         try:
             response = requests.get(url, params=params)
             response.raise_for_status()
@@ -165,7 +250,7 @@ class GoogleMapsAdapter(ApiAdapter):
         if self.verbose:
             full_url = f"{self.DIRECTIONS_URL}?{requests.compat.urlencode(params)}"
             print(f"   > [API-TRACE] Request URL: {full_url}")
-            
+
         try:
             response = requests.get(self.DIRECTIONS_URL, params=params)
             response.raise_for_status()
