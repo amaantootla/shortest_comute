@@ -37,7 +37,8 @@ class TomTomAdapter(ApiAdapter):
     GEOCODE_URL = "https://api.tomtom.com/search/2/geocode/{address}.json"
     ROUTING_URL = "https://api.tomtom.com/routing/1/calculateRoute/{locations}/json"
 
-    def __init__(self):
+    def __init__(self, verbose: bool = False):
+        self.verbose = verbose
         if not TOMTOM_API_KEY:
             raise ValueError(
                 "FATAL ERROR: The TOMTOM_API_KEY environment variable is not set.")
@@ -47,6 +48,11 @@ class TomTomAdapter(ApiAdapter):
         encoded_address = quote(address)
         url = self.GEOCODE_URL.format(address=encoded_address)
         params = {'key': TOMTOM_API_KEY}
+
+        if self.verbose:
+            full_url = f"{url}?{requests.compat.urlencode(params)}"
+            print(f"   > [API-TRACE] Request URL: {full_url}")
+
         try:
             response = requests.get(url, params=params)
             response.raise_for_status()
@@ -75,6 +81,11 @@ class TomTomAdapter(ApiAdapter):
             'departAt': departure_time.isoformat(),
             'traffic': 'true'
         }
+
+        if self.verbose:
+            full_url = f"{url}?{requests.compat.urlencode(params)}"
+            print(f"   > [API-TRACE] Request URL: {full_url}")
+            
         try:
             response = requests.get(url, params=params)
             response.raise_for_status()
@@ -100,7 +111,8 @@ class GoogleMapsAdapter(ApiAdapter):
     GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
     DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json"
 
-    def __init__(self):
+    def __init__(self, verbose: bool = False):
+        self.verbose = verbose
         if not GOOGLE_API_KEY:
             raise ValueError(
                 "FATAL ERROR: The GOOGLE_API_KEY environment variable is not set.")
@@ -111,6 +123,11 @@ class GoogleMapsAdapter(ApiAdapter):
             'address': address,
             'key': GOOGLE_API_KEY
         }
+
+        if self.verbose:
+            full_url = f"{self.GEOCODING_URL}?{requests.compat.urlencode(params)}"
+            print(f"   > [API-TRACE] Request URL: {full_url}")
+
         try:
             response = requests.get(self.GEOCODING_URL, params=params)
             response.raise_for_status()
@@ -144,6 +161,11 @@ class GoogleMapsAdapter(ApiAdapter):
             'departure_time': departure_timestamp,
             'key': GOOGLE_API_KEY
         }
+
+        if self.verbose:
+            full_url = f"{self.DIRECTIONS_URL}?{requests.compat.urlencode(params)}"
+            print(f"   > [API-TRACE] Request URL: {full_url}")
+            
         try:
             response = requests.get(self.DIRECTIONS_URL, params=params)
             response.raise_for_status()

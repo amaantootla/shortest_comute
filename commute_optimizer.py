@@ -2,6 +2,7 @@
 
 import time
 import os
+import argparse
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
@@ -159,6 +160,13 @@ def display_results(scenarios: list, analysis_date: date):
 
 if __name__ == '__main__':
     load_dotenv()
+
+    parser = argparse.ArgumentParser(
+        description="Daily Commute Optimizer: Find the best departure time.")
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help="Enable verbose mode to see the exact API calls being made.")
+    args = parser.parse_args()
+
     print("Welcome to the Daily Commute Optimizer.")
     print("This tool tests multiple departure times to find the one that")
     print("minimizes your total daily commute time (morning + evening).\n")
@@ -172,13 +180,13 @@ if __name__ == '__main__':
     try:
         if api_choice == '2':
             print("Using TomTom API.\n")
-            selected_api_adapter = TomTomAdapter()
+            selected_api_adapter = TomTomAdapter(verbose=args.verbose)
         else:
             if api_choice != '1':
                 print("Invalid choice. Using Google Maps API by default.\n")
             else:
                 print("Using Google Maps API.\n")
-            selected_api_adapter = GoogleMapsAdapter()
+            selected_api_adapter = GoogleMapsAdapter(verbose=args.verbose)
 
     except ValueError as e:
         print(e)
