@@ -40,7 +40,7 @@ The script operates through a series of modular components:
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/your-username/commute-optimizer.git](https://github.com/your-username/commute-optimizer.git)
+    git clone [https://github.com/amaantootla/commute-optimizer.git](https://github.com/amaantootla/commute-optimizer.git)
     cd commute-optimizer
     ```
 
